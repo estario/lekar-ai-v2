@@ -1,0 +1,5 @@
+CREATE TABLE public.request_limits (user_id uuid PRIMARY KEY, window_started_at timestamptz NOT NULL DEFAULT now(), request_count integer NOT NULL DEFAULT 0);
+GRANT ALL ON public.request_limits TO service_role;
+ALTER TABLE public.request_limits ENABLE ROW LEVEL SECURITY;
+CREATE FUNCTION public.reserve_clinical_request() RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$ DECLARE current_user_id uuid := auth.uid(); current_count integer; BEGIN IF current_user_id IS NULL THEN RETURN false; END IF; INSERT INTO public.request_limits(user_id,window_started_at,request_count) VALUES(current_user_id,now(),1) ON CONFLICT (user_id) DO UPDATE SET window_started_at=CASE WHEN public.request_limits.window_started_at < now() - interval '1 minute' THEN now() ELSE public.request_limits.window_started_at END, request_count=CASE WHEN public.request_limits.window_started_at < now() - interval '1 minute' THEN 1 ELSE public.request_limits.request_count+1 END RETURNING request_count INTO current_count; RETURN current_count <= 8; END $$;
+GRANT EXECUTE ON FUNCTION public.reserve_clinical_request() TO authenticated;
