@@ -36,3 +36,56 @@ No accounts or rows were kept. Each database test ran in one transaction that en
 1. In-app microphone recording (hardware, HTTPS, signed-in user) is not tested. Current actual regions: database in Lovable Cloud, Frankfurt (EU); speech processing in the Soniox US region with the existing key. If EU speech processing is chosen later, that requires an EU-specific Soniox key plus a paired change of the temporary-key endpoint and the SDK region — the two are changed together.
 2. A confirmed account is needed for a real sign-in end-to-end test in the browser.
 
+## Review-fix pass (базова ревизия afa0d07)
+
+| Област | Резултат | Доказателство |
+|---|---|---|
+| Клиничен достъп само с одобрена роля clinician/admin | PASS (unit) | `review-fixes.test.ts`: отказ при false / грешка / изключение / липсващ отговор, без prepare и без доставчик |
+| Дневни клинични лимити (отчет 40, асистент 120, запис 20), изходни лимити 3000/2000, Soniox 300 s | Внедрено | `reserve_clinical_budget`, `clinical-gate.ts`; изчерпан лимит → без доставчик (unit) |
+| Пълна проверка на входа без изрязване | PASS (unit) | брой / реплика / общо → отказ преди лимит и AI |
+| Атомарен демо лимит + общ дневен таван (100/200/400), IPv6 /64 | PASS (модел в паметта) | отхвърлена сесия не харчи мрежов/общ бюджет; 8 едновременни → 3; смяна на прозореца след 24 h. Самата SQL функция не е тествана с паралелни транзакции |
+| SQL права | PASS (на живо) | anon/authenticated нямат EXECUTE за demo_reserve/demo_consume и нямат достъп до броячите; audit е само за четене от собственика |
+| Undo/редакции/повторни шаблони/генериране по време на редакция | PASS (unit) | 6 теста за състоянието |
+| Команди изключени от отчет и асистент | PASS (unit + браузър) | етикет „гласова команда“ видим |
+| Спиране на записа при изход/край/грешка, стенен часовник с паузите | PASS (unit) | `RecordingLifecycle` |
+| Чернова на ръчно въведения текст не се трие от диктовката | PASS (браузър) | след изпращане полето е празно; нов текст остава |
+| Последните 30 съобщения в историята | PASS (unit) | |
+| Typecheck / vitest 48/48 / production build | PASS (код 0) | |
+| Реален вход с одобрен лекар, истински микрофон, паралелни SQL транзакции | НЕТЕСТИРАНО | няма профили (auth.users = 0) |
+
+## Third pass — review of revision 8783 (base `a736a68a54f7a8182717859b7631ff7a1e1400ea`, fixes on top)
+
+### Fixes
+1. **Report save ordering** — `makeReport` enqueues every replaced section write synchronously when the draft is applied, then awaits `Promise.allSettled`. One failed section no longer skips the others; partial persistence is shown as a save error (listing sections), not a generation failure. Later manual edits/verification queue after generated content.
+2. **Workspace/auth generation** — single `invalidateWorkspace()` (bumps generation, clears save timers/queues/versions, owner, busy) on SIGNED_OUT, auth identity switch, demo entry, End demo and unmount. `loadCloud`, `persistSection` queue callbacks and clinical `sendQuestion` capture generation + owner id and drop stale results; writes use the captured owner, never the current user.
+3. **Quota SQL** — opportunistic stale-row deletes removed from BOTH `demo_reserve` and `demo_consume` (either could lock rows another call uses; a delete between `INSERT … DO NOTHING` and `SELECT … FOR UPDATE` in `demo_reserve` could also leave no row → NULL comparison → `ok:true` without debit); reservation locks only its requested buckets in sorted order. New service-only `demo_quota_cleanup()` (max 200 rows, SKIP LOCKED) runs as a separate best-effort transaction on ~5% of reservations (migration 0007).
+
+### Executed (mocked network, synthetic data, no real accounts)
+| Check | Result |
+|---|---|
+| Delayed first section save (3 s) + edit and Verify of a later section during it | PASS — storage and UI both end with the newer edit, verified |
+| Delayed cloud load (3 s) + sign-out during it | PASS — old consultations not restored after logout |
+| Delayed clinical assistant (3 s) + sign-out during it | PASS — no chat insert, no answer shown |
+| First generated section save fails (HTTP 500) | PASS — other 3 sections still saved, draft shown, save error lists the failed section |
+| vitest | PASS 48/48 |
+| typecheck / production build | PASS / exit 0 |
+
+### Not executed (honest)
+- Actual concurrent SQL test of `demo_reserve`/`demo_consume`: NOT executed — DB tooling here allows only single queries, no parallel transactions. The in-memory quota fixture tests are not live SQL evidence. Fix is by code review only.
+- Delayed cloud load + demo entry: guarded by the same generation (demo entry now invalidates), not separately browser-tested.
+- Auth identity switch without sign-out (A→B in-place): code path added, not browser-tested (only sign-out was simulated).
+- Correction to earlier note: waiting with a typed draft does **not** test a dictation callback. Fake-audio Soniox check that an unsent manual draft survives final speech/flush, BG+EN voice command, repeated Undo, generation during manual editing, whole-input error and reset were **not re-run** on this final code.
+- Real sign-in and physical microphone: not tested.
+
+### Follow-up (migration 0008, additive)
+- `demo_reserve` now locks each requested bucket in sorted order with an atomic `INSERT … ON CONFLICT DO UPDATE SET bucket = c.bucket` (no gap where a separate cleanup could delete the row). If a row is missing, a field is NULL or remaining is incomplete, it fails closed (`ok:false` or an exception), never `ok:true`. The server wrapper also rejects an `ok:true` result whose remaining values are missing or invalid. Earlier migrations were not edited.
+- Blur without a pending edit no longer saves `verified_at = null`: focusing and leaving an untouched verified section keeps its verification and sends no save.
+- Auth user id is tracked as state; role lookup, cloud loading and integration status rerun on an in-place A→B switch, and a late integration status from the old generation is dropped.
+
+| Check (executed this pass) | Result |
+|---|---|
+| Mocked T1–T4 (save order, sign-out during load/assistant, partial save) rerun | PASS |
+| Focus/blur of an untouched verified section (mocked) | PASS — 0 saves, still "Проверено" |
+| vitest / typecheck / production build | 48/48 / PASS / exit 0 |
+
+Not executed: live concurrent SQL against `demo_reserve` (tooling has no parallel transactions; code review only); in-place A→B auth switch in a browser (code path only).

@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      clinical_daily_usage: {
+        Row: {
+          day: string
+          kind: string
+          used: number
+          user_id: string
+        }
+        Insert: {
+          day: string
+          kind: string
+          used?: number
+          user_id: string
+        }
+        Update: {
+          day?: string
+          kind?: string
+          used?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       clinician_profiles: {
         Row: {
           ai_instructions: string
@@ -110,6 +131,45 @@ export type Database = {
           bucket?: string
           used?: number
           window_start?: string
+        }
+        Relationships: []
+      }
+      report_section_audit: {
+        Row: {
+          action: string
+          actor: string | null
+          at: string
+          clinician_id: string
+          consultation_id: string
+          content_length: number
+          content_sha256: string
+          id: number
+          section: string
+          verified: boolean
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          at?: string
+          clinician_id: string
+          consultation_id: string
+          content_length: number
+          content_sha256: string
+          id?: number
+          section: string
+          verified: boolean
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          at?: string
+          clinician_id?: string
+          consultation_id?: string
+          content_length?: number
+          content_sha256?: string
+          id?: number
+          section?: string
+          verified?: boolean
         }
         Relationships: []
       }
@@ -239,6 +299,7 @@ export type Database = {
       }
       transcript_segments: {
         Row: {
+          client_seq: number | null
           clinician_id: string
           consultation_id: string
           created_at: string
@@ -249,6 +310,7 @@ export type Database = {
           text: string
         }
         Insert: {
+          client_seq?: number | null
           clinician_id: string
           consultation_id: string
           created_at?: string
@@ -259,6 +321,7 @@ export type Database = {
           text: string
         }
         Update: {
+          client_seq?: number | null
           clinician_id?: string
           consultation_id?: string
           created_at?: string
@@ -319,9 +382,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_roles: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"][]
+      }
       demo_consume: {
         Args: { _bucket: string; _limit: number; _window_seconds: number }
         Returns: number
+      }
+      demo_quota_cleanup: { Args: never; Returns: number }
+      demo_reserve: {
+        Args: { _buckets: string[]; _limits: number[]; _windows: number[] }
+        Returns: Json
       }
       has_role: {
         Args: {
@@ -330,6 +402,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_clinical_user: { Args: never; Returns: boolean }
+      reserve_clinical_budget: { Args: { _kind: string }; Returns: number }
       reserve_clinical_request: { Args: never; Returns: boolean }
     }
     Enums: {
@@ -465,4 +539,3 @@ export const Constants = {
     },
   },
 } as const
-

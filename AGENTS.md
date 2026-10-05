@@ -19,4 +19,7 @@
 - Public demo uses separate demo-only server functions with an HMAC session token derived from an existing server secret plus server-side hashed quota counters; demo content stays in browser memory and never touches clinical tables or authenticated handlers.
 - Demo UI text lives in src/lib/i18n.ts (bg/en dictionaries, one shared locale state); demo AI calls take an allowlisted language — keeps translations in one place and server input bounded.
 - Demo voice phrases (src/lib/voice-phrases.ts) are deterministic, in-memory, doctor-only whole-utterance matches with expansion text snapshotted per session; keeps preset text out of AI input and clinical storage.
-
+- Clinical server functions go through clinical-gate.gatedCall (role → complete input → minute+daily budget → provider); roles are only ever granted by an admin so public signups cannot spend clinical budgets.
+- AI input is validated whole by src/lib/ai-input.ts and rejected before quota/provider; never slice transcripts silently.
+- Report section state transitions (revisions, tracked insertions, Undo, guarded merge) live in src/lib/report-state.ts as pure functions so they stay testable.
+- Recorder/timer lifetime is owned by RecordingLifecycle; every async step checks its generation.

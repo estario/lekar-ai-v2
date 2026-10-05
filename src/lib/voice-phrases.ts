@@ -5,6 +5,7 @@ import type { Language } from './i18n';
 // inserts a preconfigured paragraph. Lives in browser memory only; no AI involved.
 export type VoicePhrase = { id: string; trigger: string; expansion: string; section: SectionKey; language: Language; enabled: boolean };
 import type { SectionExpansion } from './clinical';
+import { evidenceSegments, insertTracked } from './report-state';
 export type Expansion = SectionExpansion;
 
 export function normalizeUtterance(value: string): string {
@@ -58,18 +59,13 @@ export function reapplyExpansions(report: Record<SectionKey, string>, expansions
 }
 
 type ExpansionTarget = { sections: Record<SectionKey, { content: string; verified_at: string | null }>; expansions?: Expansion[] };
-/** Pure, idempotent per sourceKey: a repeated callback/finalization for the same source never inserts twice. */
+/** Pure, idempotent per sourceKey: a repeated callback/finalization for the same source never inserts twice. Tracks exact range. */
 export function applyExpansionTo<T extends ExpansionTarget>(s: T, sourceKey: string, cue: string, p: VoicePhrase, opts: { id: string; at: string; manual: boolean; segmentId: string | null }): T {
-  if ((s.expansions ?? []).some(e => e.sourceKey === sourceKey)) return s;
-  const text = p.expansion.trim();
-  return { ...s, sections: { ...s.sections, [p.section]: { content: insertExpansion(s.sections[p.section].content, text), verified_at: null } }, expansions: [...(s.expansions ?? []), { id: opts.id, sourceKey, phraseId: p.id, cue: cue.trim(), text, section: p.section, at: opts.at, manual: opts.manual, segmentId: opts.segmentId }] };
+  return insertTracked(s, { id: opts.id, sourceKey, phraseId: p.id, cue: cue.trim(), text: p.expansion.trim(), section: p.section, at: opts.at, manual: opts.manual, segmentId: opts.segmentId });
 }
 
-/** Segments that were pure voice-phrase cues are excluded from AI input; the template is appended deterministically instead. */
-export const withoutCueSegments = <S extends { id: string }>(segments: readonly S[], expansions: readonly Expansion[] | undefined) => {
-  const cues = new Set((expansions ?? []).map(e => e.segmentId).filter(Boolean));
-  return segments.filter(s => !cues.has(s.id));
-};
+/** Command-only segments (persisted command identity, or legacy expansion link) never reach AI input. */
+export const withoutCueSegments = evidenceSegments;
 
 export type FinalToken = { text: string; is_final?: boolean | undefined; speaker?: string | undefined };
 /**
@@ -94,4 +90,3 @@ export class FinalUtteranceBuffer {
     return this.parts.splice(0).filter(p => p.text.trim()).map(p => ({ key: `${this.runId}:${this.n++}`, speakerId: p.speakerId, text: p.text.trim() }));
   }
 }
-

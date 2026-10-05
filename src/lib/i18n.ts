@@ -49,9 +49,22 @@ const bg = {
   quick: ['Какво липсва в анамнезата?', 'Обобщи разговора'], askAria: 'Въпрос към асистента', askPh: 'Попитайте за документацията…', send: 'Изпрати', noAnswer: 'Асистентът не отговори.',
   copied: 'Копирано в клипборда.', copiedUnverified: 'Копирано. Внимание: документът съдържа непроверени раздели.', copyDenied: 'Копирането не беше позволено от браузъра.',
   needText: 'Добавете текст към разговора преди генериране.', draftReady: 'Черновата е готова. Проверете всеки раздел.', genFail: 'Неуспешно генериране.',
-  finishFirst: 'Завършете записа и изчакайте запазването на всички реплики.', unsaved: 'Има незапазени реплики. Проверете разговора преди генериране.', navBlocked: 'Завършете записа, преди да смените екрана или прегледа.',
+  finishFirst: 'Завършете записа и изчакайте запазването на всички реплики.', unsaved: 'Има незапазени реплики. Проверете разговора преди генериране.',
+    partialSave: (list: string) => `Чернова е генерирана, но не се запазиха в облака: ${list}. Редактирайте или опитайте отново.`, navBlocked: 'Завършете записа, преди да смените екрана или прегледа.',
   noConsentRec: 'Няма записано съгласие за този разговор. Записът не може да започне.', recInterrupted: 'Записът беше прекъснат.', recCheck: ' Завършете записа и проверете текста преди генериране.', micUnavailable: 'Микрофонът не е достъпен. Ръчният текст остава наличен.',
   recLimitHit: 'Достигнат е лимитът от 5 минути за демо запис. Записът се завършва.', recDone: 'Записът е завършен. Прегледайте текста преди генериране.', recFail: 'Записът не завърши успешно.', segsLost: 'Част от репликите не бяха запазени. Проверете разговора и ги въведете отново преди генериране.',
+  tooLong: (p: 'empty' | 'count' | 'segment' | 'total'): string => p === 'empty' ? 'Добавете текст към разговора преди генериране.' : p === 'count' ? 'Разговорът има твърде много реплики за една заявка. Нищо не е изпратено.' : p === 'segment' ? 'Има реплика, която е твърде дълга. Разделете я. Нищо не е изпратено.' : 'Разговорът е твърде дълъг за една заявка. Нищо не е изпратено и лимитът не е използван.',
+  overwriteAsk: (list: string) => `Разделите „${list}“ са проверени или ръчно редактирани. Да бъдат ли заменени с нова чернова? (Отказ = запазват се непроменени.)`,
+  nothingReplaced: 'Всички раздели са запазени. Нищо не е генерирано.',
+  keptSections: (list: string) => `Запазени без промяна: ${list}.`,
+  needEvidence: 'Няма реплики за обработка. Добавете разговор или гласова фраза.',
+  recWallLimit: 'Достигнат е лимитът на записа (включително паузите). Записът се завършва автоматично.',
+  recProviderEnded: 'Връзката с транскрипцията прекъсна. Получените реплики са запазени; можете да започнете нов запис.',
+  vpCommand: 'гласова команда (не се изпраща към AI)',
+  vpOrphaned: 'редактирано ръчно — не може да се отмени',
+  notApprovedTitle: 'Профилът очаква одобрение',
+  notApprovedText: 'Влезли сте, но профилът Ви още не е одобрен за клинична работа. Дотогава можете да използвате демото с измислени данни.',
+  approveClinician: 'Клиничен достъп',
   exportHeader: 'ДЕМО — измислени данни, не за медицинска употреба.', demoDoctor: 'Демо лекар', demoSpecialty: 'Обща медицина',
 };
 type Dict = typeof bg;
@@ -89,15 +102,32 @@ const en: Dict = {
   quick: ['What is missing from the history?', 'Summarize the conversation'], askAria: 'Question for the assistant', askPh: 'Ask about the documentation…', send: 'Send', noAnswer: 'The assistant did not respond.',
   copied: 'Copied to clipboard.', copiedUnverified: 'Copied. Note: the document contains unverified sections.', copyDenied: 'The browser did not allow copying.',
   needText: 'Add conversation text before generating.', draftReady: 'The draft is ready. Review each section.', genFail: 'Generation failed.',
-  finishFirst: 'Finish recording and wait for all lines to be saved.', unsaved: 'Some lines were not saved. Check the conversation before generating.', navBlocked: 'Finish recording before changing screen or consultation.',
+  finishFirst: 'Finish recording and wait for all lines to be saved.', unsaved: 'Some lines were not saved. Check the conversation before generating.',
+    partialSave: (list: string) => `Draft generated, but these sections were not saved to the cloud: ${list}. Edit or retry.`, navBlocked: 'Finish recording before changing screen or consultation.',
   noConsentRec: 'No acknowledgment recorded for this conversation. Recording cannot start.', recInterrupted: 'Recording was interrupted.', recCheck: ' Finish recording and check the text before generating.', micUnavailable: 'Microphone unavailable. Manual entry remains available.',
   recLimitHit: 'The 5-minute demo recording limit was reached. Finishing the recording.', recDone: 'Recording finished. Review the text before generating.', recFail: 'Recording did not finish successfully.', segsLost: 'Some lines were not saved. Check the conversation and re-enter them before generating.',
+  tooLong: (p: 'empty' | 'count' | 'segment' | 'total') => p === 'empty' ? 'Add conversation text before generating.' : p === 'count' ? 'The conversation has too many lines for one request. Nothing was sent.' : p === 'segment' ? 'One line is too long. Split it. Nothing was sent.' : 'The conversation is too long for one request. Nothing was sent and no quota was used.',
+  overwriteAsk: (list: string) => `The sections “${list}” are verified or manually edited. Replace them with a new draft? (Cancel = keep them unchanged.)`,
+  nothingReplaced: 'All sections were kept. Nothing was generated.',
+  keptSections: (list: string) => `Kept unchanged: ${list}.`,
+  needEvidence: 'There are no lines to process. Add conversation or a voice phrase.',
+  recWallLimit: 'The recording limit (pauses included) was reached. Finishing the recording automatically.',
+  recProviderEnded: 'The transcription connection ended. Received lines are saved; you can start a new recording.',
+  vpCommand: 'voice command (not sent to AI)',
+  vpOrphaned: 'edited manually — cannot be undone',
+  notApprovedTitle: 'Account awaiting approval',
+  notApprovedText: 'You are signed in, but your account is not yet approved for clinical work. Meanwhile you can use the demo with fictional data.',
+  approveClinician: 'Clinical access',
   exportHeader: 'DEMO — fictional data, not for medical use.', demoDoctor: 'Demo physician', demoSpecialty: 'General practice',
 };
 export const ui: Record<Language, Dict> = { bg, en };
 
 /** Known Bulgarian server messages → English, so English visitors never see untranslated errors. */
 const serverErrorsEn: [string, string][] = [
+  ['Входът е твърде дълъг', 'The input is too long for one request. Nothing was sent.'],
+  ['Дневният общ лимит', 'The overall daily demo limit has been reached. Try tomorrow.'],
+  ['Профилът не е одобрен', 'This account is not approved for clinical work. Use the demo.'],
+  ['Дневният клиничен лимит', 'The daily clinical limit for this service has been reached.'],
   ['Невалидна демо сесия', 'Invalid demo session. Start again.'],
   ['Демо сесията изтече', 'The demo session expired. Start again.'],
   ['Твърде много заявки', 'Too many requests. Wait a minute.'],
@@ -143,4 +173,3 @@ export function demoSessionsFor(lang: Language): Session[] {
 }
 
 export const dateFor = (lang: Language, date: string) => new Intl.DateTimeFormat(lang === 'bg' ? 'bg-BG' : 'en-GB', { timeZone: 'Europe/Sofia', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(date));
-

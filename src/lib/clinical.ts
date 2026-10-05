@@ -1,10 +1,10 @@
 export type SectionKey = 'anamneza' | 'status' | 'izsledvania' | 'terapia';
 export const sectionLabels: Record<SectionKey,string> = { anamneza:'Анамнеза', status:'Статус', izsledvania:'Изследвания', terapia:'Терапия' };
 export const keys = Object.keys(sectionLabels) as SectionKey[];
-export type Segment = { id:string; speaker:'doctor'|'patient'; speaker_id?:string|null; text:string; seconds:number };
-export type SectionExpansion = { id:string; sourceKey:string; phraseId:string; cue:string; text:string; section:SectionKey; at:string; manual:boolean; segmentId?:string|null };
+export type Segment = { id:string; speaker:'doctor'|'patient'; speaker_id?:string|null; text:string; seconds:number; seq?:number|null; command?:{ phraseId:string; cue:string }|null };
+export type SectionExpansion = { id:string; sourceKey:string; phraseId:string; cue:string; text:string; section:SectionKey; at:string; manual:boolean; segmentId?:string|null; start?:number; sep?:number; status?:'active'|'orphaned' };
 export type Section = { content:string; verified_at:string|null };
-export type Session = { id:string; patient_name:string; patient_identifier:string; patient_age:number|null; patient_sex:string|null; mode:'conversation'|'dictation'; status:string; consent_at:string|null; duration_seconds:number; patient_instructions:string; created_at:string; segments:Segment[]; sections:Record<SectionKey,Section>; expansions?:SectionExpansion[] };
+export type Session = { id:string; patient_name:string; patient_identifier:string; patient_age:number|null; patient_sex:string|null; mode:'conversation'|'dictation'; status:string; consent_at:string|null; duration_seconds:number; patient_instructions:string; created_at:string; segments:Segment[]; sections:Record<SectionKey,Section>; expansions?:SectionExpansion[]; revisions?:Partial<Record<SectionKey,number>>; edited?:Partial<Record<SectionKey,boolean>> };
 export const emptySections = ():Record<SectionKey,Section> => ({ anamneza:{content:'',verified_at:null}, status:{content:'',verified_at:null}, izsledvania:{content:'',verified_at:null}, terapia:{content:'',verified_at:null} });
 const today = new Date();
 export const demoSessions:Session[] = [
@@ -20,4 +20,3 @@ export const demoSessions:Session[] = [
 export const maskIdentifier = (value:string) => value ? `${value.slice(0,2)}••••••${value.slice(-2)}` : 'Не е посочено';
 export const timeBg = (date:string) => new Intl.DateTimeFormat('bg-BG',{timeZone:'Europe/Sofia',hour:'2-digit',minute:'2-digit'}).format(new Date(date));
 export const dateBg = (date:string) => new Intl.DateTimeFormat('bg-BG',{timeZone:'Europe/Sofia',day:'numeric',month:'long',year:'numeric'}).format(new Date(date));
-

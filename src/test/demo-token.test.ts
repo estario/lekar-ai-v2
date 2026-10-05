@@ -33,7 +33,7 @@ describe('demo session token', () => {
   it('has finite quotas', () => expect(DEMO_QUOTAS).toEqual({ recordings: 3, reports: 5, assistant: 10 }));
 });
 
-import { isAllowedOrigin, reserveQuota } from '@/lib/demo-token';
+import { DEMO_GLOBAL_DAILY, isAllowedOrigin, memoryReserve, normalizeClientIp, reserveQuota } from '@/lib/demo-token';
 describe('demo origin allowlist', () => {
   const H = (o: Record<string, string>) => new Headers(o);
   it('accepts preview, embedded preview and published hosts for this project', () => {
@@ -50,11 +50,10 @@ describe('demo origin allowlist', () => {
     expect(isAllowedOrigin(H({ host: 'x' }))).toBe(false);
   });
 });
-describe('demo quota reservation (scoped in-memory counter fixture, no provider)', () => {
-  const fixture = () => { const m = new Map<string, number>(); return async (b: string, limit: number) => { const u = (m.get(b) || 0) + 1; m.set(b, u); return limit - u; }; };
+describe('demo quota reservation (in-memory model of demo_reserve, no provider)', () => {
   it('denies the 6th report and 11th assistant call before any provider invocation', async () => {
-    const consume = fixture(); let provider = 0;
-    const act = async (kind: 'reports' | 'assistant', ip: string) => { await reserveQuota(consume, kind, 'sid-1', ip); provider++; };
+    const { consume, reserve } = memoryReserve(); let provider = 0;
+    const act = async (kind: 'reports' | 'assistant', ip: string) => { await reserveQuota(consume, reserve, kind, 'sid-1', ip); provider++; };
     for (let i = 0; i < 5; i++) await act('reports', `ip${i}`);
     await expect(act('reports', 'ip9')).rejects.toThrow(/сесия е изчерпан/);
     expect(provider).toBe(5);
@@ -63,9 +62,42 @@ describe('demo quota reservation (scoped in-memory counter fixture, no provider)
     expect(provider).toBe(15);
   });
   it('throttles more than 20 requests per minute per IP', async () => {
-    const consume = fixture();
-    for (let i = 0; i < 20; i++) await reserveQuota(consume, 'assistant', `s${i}`, 'same');
-    await expect(reserveQuota(consume, 'assistant', 'new', 'same')).rejects.toThrow(/минута/);
+    const { consume, reserve } = memoryReserve();
+    for (let i = 0; i < 20; i++) await reserveQuota(consume, reserve, 'assistant', `s${i}`, 'same');
+    await expect(reserveQuota(consume, reserve, 'assistant', 'new', 'same')).rejects.toThrow(/минута/);
+  });
+  it('a rejected session spends nothing from network or global daily budgets (atomic)', async () => {
+    const { consume, reserve, rows } = memoryReserve();
+    for (let i = 0; i < 5; i++) await reserveQuota(consume, reserve, 'reports', 'sidA', 'ip1');
+    const before = { ip: rows.get('ip:ip1:day:reports')!.used, global: rows.get('global:day:reports')!.used };
+    await expect(reserveQuota(consume, reserve, 'reports', 'sidA', 'ip1')).rejects.toThrow(/сесия/);
+    expect(rows.get('ip:ip1:day:reports')!.used).toBe(before.ip);
+    expect(rows.get('global:day:reports')!.used).toBe(before.global);
+  });
+  it('global daily ceiling rejects without debiting the new session', async () => {
+    let now = 0; const { consume, reserve, rows } = memoryReserve(() => now);
+    for (let i = 0; i < DEMO_GLOBAL_DAILY.recordings; i++) { now += 61_000; await reserveQuota(consume, reserve, 'recordings', `s${i}`, `ip${i % 50}`); }
+    now += 61_000;
+    await expect(reserveQuota(consume, reserve, 'recordings', 'fresh', 'ipX')).rejects.toThrow(/общ лимит/);
+    expect(rows.get('sid:fresh:recordings')).toBeUndefined();
+  });
+  it('rolls the window over after 24h and concurrent reservations never exceed the limit', async () => {
+    let now = 0; const { consume, reserve } = memoryReserve(() => now);
+    const results = await Promise.allSettled(Array.from({ length: 8 }, (_, i) => reserveQuota(consume, reserve, 'recordings', 'sidC', `ip${i}`)));
+    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(3);
+    now += 86_401_000;
+    await expect(reserveQuota(consume, reserve, 'recordings', 'sidC', 'ip0')).resolves.toBe(2);
+  });
+});
+describe('client IP normalization', () => {
+  it('collapses IPv6 to /64 and refuses junk', () => {
+    expect(normalizeClientIp('2001:db8:1:2:aaaa::1')).toBe(normalizeClientIp('2001:0db8:0001:0002:ffff:1:2:3'));
+    expect(normalizeClientIp('2001:db8:1:2::1')).toBe('2001:db8:1:2::/64');
+    expect(normalizeClientIp('2001:db8:1:3::1')).not.toBe(normalizeClientIp('2001:db8:1:2::1'));
+    expect(normalizeClientIp('::ffff:10.0.0.1')).toBe('10.0.0.1');
+    expect(normalizeClientIp('203.0.113.5')).toBe('203.0.113.5');
+    expect(normalizeClientIp(null)).toBe('unknown-shared');
+    expect(normalizeClientIp('evil, 1.2.3.4')).toBe('unknown-shared');
   });
 });
 describe('published host', () => {
@@ -74,4 +106,3 @@ describe('published host', () => {
     expect(isAllowedOrigin(new Headers({ host: 'internal', origin: 'https://lekari-ai-bulgaria.lovable.app.evil.com' }))).toBe(false);
   });
 });
-

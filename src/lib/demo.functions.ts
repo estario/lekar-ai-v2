@@ -1,7 +1,8 @@
 import { createServerFn } from '@tanstack/react-start';
 import { getRequest } from '@tanstack/react-start/server';
 import { z } from 'zod';
-import { DEMO_QUOTAS, isAllowedOrigin, reserveQuota, sha256Hex, signDemoToken, verifyDemoToken, type DemoQuotaKind } from './demo-token';
+import { DEMO_QUOTAS, isAllowedOrigin, normalizeClientIp, reserveQuota, sha256Hex, signDemoToken, verifyDemoToken, type DemoQuotaKind, type Reserve } from './demo-token';
+import { ASSISTANT_HISTORY_CHARS, ASSISTANT_HISTORY_MESSAGES, DEMO_ASSISTANT_BUDGET, DEMO_REPORT_BUDGET, QUESTION_MAX_CHARS, buildTranscript } from './ai-input';
 
 // Public demo endpoints. They never touch clinical tables; only hashed quota counters are written.
 // Speech and transcript text are never logged.
@@ -19,7 +20,8 @@ function secret() {
 async function guard(token?: string) {
   const request = getRequest();
   if (!isAllowedOrigin(request.headers, request.url)) throw new Error('Заявката не е разрешена.');
-  const ip = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  // Trust only the ingress-set client IP (Cloudflare). Absent -> one shared fail-closed bucket; client headers like X-Forwarded-For are ignored.
+  const ip = normalizeClientIp(request.headers.get('cf-connecting-ip'));
   const ipHash = (await sha256Hex(`${secret()}|ip|${ip}`)).slice(0, 32);
   const claims = token ? await verifyDemoToken(secret(), token) : null;
   return { ipHash, claims };
@@ -30,9 +32,19 @@ async function consume(bucket: string, limit: number, windowSeconds: number) {
   if (error) throw new Error('Лимитът не може да бъде проверен. Опитайте по-късно.');
   return data as number;
 }
-const quota = (kind: DemoQuotaKind, sid: string, ipHash: string) => reserveQuota(consume, kind, sid, ipHash);
-const transcriptOf = (segments: z.infer<typeof segmentsSchema>, max: number) =>
-  segments.map(s => `${s.speaker_id ? `Говорител ${s.speaker_id}` : s.speaker === 'doctor' ? 'Лекар' : 'Пациент'}: ${s.text}`).join('\n').slice(0, max);
+const reserve: Reserve = async items => {
+  const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
+  const { data, error } = await (supabaseAdmin.rpc as any)('demo_reserve', { _buckets: items.map(i => i.bucket), _limits: items.map(i => i.limit), _windows: items.map(i => i.window) });
+  if (error || !data || typeof data !== 'object') throw new Error('Лимитът не може да бъде проверен. Опитайте по-късно.');
+  const r = data as { ok: boolean; failed?: number; remaining?: number[] };
+  // Stale-row cleanup runs as a separate, bounded, best-effort transaction — never inside the reservation.
+  if (Math.random() < 0.05) { try { await (supabaseAdmin.rpc as any)('demo_quota_cleanup'); } catch { /* best effort */ } }
+  if (r.ok !== true) return { ok: false, failed: typeof r.failed === 'number' ? r.failed : 0 };
+  // Fail closed on any missing/invalid remaining value.
+  if (!Array.isArray(r.remaining) || r.remaining.length !== items.length || r.remaining.some(v => typeof v !== 'number' || !Number.isFinite(v))) throw new Error('Лимитът не може да бъде проверен. Опитайте по-късно.');
+  return { ok: true, remaining: r.remaining };
+};
+const quota = (kind: DemoQuotaKind, sid: string, ipHash: string) => reserveQuota(consume, reserve, kind, sid, ipHash);
 
 export const startDemo = createServerFn({ method: 'POST' }).handler(async () => {
   const { ipHash } = await guard();
@@ -45,11 +57,12 @@ export const demoReport = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => z.object({ token: tokenSchema, segments: segmentsSchema, specialty: z.string().max(120).default(''), instructions: z.string().max(600).default(''), language: languageSchema }).parse(input))
   .handler(async ({ data }) => {
     const { claims, ipHash } = await guard(data.token);
+    const transcript = buildTranscript(data.segments, DEMO_REPORT_BUDGET); // complete input or reject before quota
     const left = await quota('reports', claims!.sid, ipHash);
     const { streamClinicalText } = await import('@/lib/ai/clinical.server');
     const result = streamClinicalText(secret(), [
       { role: 'system', content: `ДЕМО със синтетични данни. Структурирай само действително казаното в медицинския разговор. Не измисляй находки, диагноза, лекарства или изследвания. Неподкрепените раздели остави празни. Всеки раздел до 120 думи. Отговори САМО с JSON обект със string полета anamneza,status,izsledvania,terapia. Специалност: ${data.specialty || 'непосочена'}. Лекарски инструкции: ${data.instructions}${langLine(data.language)}` },
-      { role: 'user', content: transcriptOf(data.segments, 12000) },
+      { role: 'user', content: transcript },
     ], { maxOutputTokens: 3000 });
     const text = await result.text;
     if ((await result.finishReason) === 'length') throw new Error('Отчетът е твърде дълъг за демото. Съкратете разговора и опитайте отново.');
@@ -62,16 +75,17 @@ export const demoReport = createServerFn({ method: 'POST' })
 
 export const demoAssistant = createServerFn({ method: 'POST' })
   .inputValidator((input: unknown) => z.object({
-    token: tokenSchema, segments: z.array(segmentSchema).max(120), question: z.string().trim().min(1).max(1000), language: languageSchema,
-    history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(3000) })).max(10),
+    token: tokenSchema, segments: z.array(segmentSchema).max(120), question: z.string().trim().min(1).max(QUESTION_MAX_CHARS), language: languageSchema,
+    history: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(ASSISTANT_HISTORY_CHARS) })).max(ASSISTANT_HISTORY_MESSAGES),
   }).parse(input))
   .handler(async ({ data }) => {
     const { claims, ipHash } = await guard(data.token);
+    const transcript = buildTranscript(data.segments, DEMO_ASSISTANT_BUDGET, true);
     const left = await quota('assistant', claims!.sid, ipHash);
     const { streamClinicalText } = await import('@/lib/ai/clinical.server');
     const result = streamClinicalText(secret(), [
       { role: 'system', content: `ДЕМО със синтетични данни. Ти си помощник за документация на лекар. Давай кратки предложения ${data.language === 'en' ? 'на английски' : 'на български'} (до 150 думи) само въз основа на предоставения разговор. Изрично обозначавай липсваща информация. Не поставяй самостоятелно диагнози и не предписвай терапия.` + langLine(data.language) },
-      { role: 'user', content: `Разговор:\n${data.segments.length ? transcriptOf(data.segments, 8000) : '(празен)'}` },
+      { role: 'user', content: `Разговор:\n${transcript || '(празен)'}` },
       ...data.history, { role: 'user', content: data.question },
     ], { maxOutputTokens: 2000 });
     const text = await result.text;
@@ -92,4 +106,3 @@ export const demoSonioxKey = createServerFn({ method: 'POST' })
     if (!payload.api_key) throw new Error('Липсва временен ключ за транскрипция.');
     return { api_key: payload.api_key, remaining: left, maxSeconds: 300 };
   });
-

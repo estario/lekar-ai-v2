@@ -1,6 +1,6 @@
 # Lekar AI v2 — source export
 
-Exported on 2026-10-05 from Lovable project `8edcb921-cddd-47da-b742-f78009807ab8` at revision `afa0d07b4cf87448283ace53a2886d26f9458cff`.
+Exported on 2026-10-05 from Lovable project `8edcb921-cddd-47da-b742-f78009807ab8` at revision `90600e7e83d0e9b4d7ec6ce4ab30a7d8287cdd3f`, after the source-review fixes. The original review refers to baseline `afa0d07b4cf87448283ace53a2886d26f9458cff`.
 
 Live synthetic demo: https://lekari-ai-bulgaria.lovable.app/
 Editor: https://lovable.dev/projects/8edcb921-cddd-47da-b742-f78009807ab8
