@@ -8,6 +8,7 @@
 - [Поправки и независими проверки — 2026-10-05](reviews/2026-10-05/FIXES.md)
 - [Сравнение на scribe системи](reviews/2026-10-05/SCRIBE-COMPARISON.md)
 - [Обновено scribe демо и независима проверка](reviews/2026-10-05/SCRIBE-DEMO.md)
+- [Лого, favicon и preview при споделяне](reviews/2026-10-05/BRANDING.md)
 - [Произход и граници на експорта](EXPORT.md)
 - [Cloud настройка](SETUP.md)
 
