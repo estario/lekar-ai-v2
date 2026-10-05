@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { getRequest } from '@tanstack/react-start/server';
 import { z } from 'zod';
 import { DEMO_QUOTAS, isAllowedOrigin, normalizeClientIp, reserveQuota, sha256Hex, signDemoToken, verifyDemoToken, type DemoQuotaKind, type Reserve } from './demo-token';
+import { DOC_KINDS, DOC_LANGS, DOC_OUTPUT_CAP, DOC_SECTION_MAX, REPORT_STYLES, REPORT_TEMPLATES, checkDocumentInput, documentPrompt, presetPrompt } from './demo-scribe';
 import { ASSISTANT_HISTORY_CHARS, ASSISTANT_HISTORY_MESSAGES, DEMO_ASSISTANT_BUDGET, DEMO_REPORT_BUDGET, QUESTION_MAX_CHARS, buildTranscript } from './ai-input';
 
 // Public demo endpoints. They never touch clinical tables; only hashed quota counters are written.
@@ -54,14 +55,14 @@ export const startDemo = createServerFn({ method: 'POST' }).handler(async () => 
 });
 
 export const demoReport = createServerFn({ method: 'POST' })
-  .inputValidator((input: unknown) => z.object({ token: tokenSchema, segments: segmentsSchema, specialty: z.string().max(120).default(''), instructions: z.string().max(600).default(''), language: languageSchema }).parse(input))
+  .inputValidator((input: unknown) => z.object({ token: tokenSchema, segments: segmentsSchema, specialty: z.string().max(120).default(''), instructions: z.string().max(600).default(''), language: languageSchema, template: z.enum(REPORT_TEMPLATES).default('general'), style: z.enum(REPORT_STYLES).default('concise') }).parse(input))
   .handler(async ({ data }) => {
     const { claims, ipHash } = await guard(data.token);
     const transcript = buildTranscript(data.segments, DEMO_REPORT_BUDGET); // complete input or reject before quota
     const left = await quota('reports', claims!.sid, ipHash);
     const { streamClinicalText } = await import('@/lib/ai/clinical.server');
     const result = streamClinicalText(secret(), [
-      { role: 'system', content: `ДЕМО със синтетични данни. Структурирай само действително казаното в медицинския разговор. Не измисляй находки, диагноза, лекарства или изследвания. Неподкрепените раздели остави празни. Всеки раздел до 120 думи. Отговори САМО с JSON обект със string полета anamneza,status,izsledvania,terapia. Специалност: ${data.specialty || 'непосочена'}. Лекарски инструкции: ${data.instructions}${langLine(data.language)}` },
+      { role: 'system', content: `ДЕМО със синтетични данни. Структурирай само действително казаното в медицинския разговор. Не измисляй находки, диагноза, лекарства или изследвания. Неподкрепените раздели остави празни. Въпросът на лекаря НИКОГА не е факт. Записвай отречен симптом само ако пациентът изрично го отрича; при въпрос за няколко симптома частичният отговор отрича само изрично назованите — за неотговорен симптом не пиши „отрича“, „не съобщава“, „няма“ или друга отрицателна формулировка — или го пропусни, или напиши, че отговорът не е уточнен. В status/izsledvania/terapia записвай само това, което лекарят реално заявява като извършен преглед, резултат или план. Не извеждай възраст, пол или диагноза, ако не са изрично казани. Ако полът не е посочен, използвай неутрални формулировки (напр. „пациентът съобщава“, безлични конструкции), без род в миналите глаголи. ${presetPrompt(data.template, data.style)} Отговори САМО с JSON обект със string полета anamneza,status,izsledvania,terapia. Специалност: ${data.specialty || 'непосочена'}. Лекарски инструкции: ${data.instructions}${langLine(data.language)}` },
       { role: 'user', content: transcript },
     ], { maxOutputTokens: 3000 });
     const text = await result.text;
@@ -70,7 +71,7 @@ export const demoReport = createServerFn({ method: 'POST' })
     try { parsed = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')); } catch { throw new Error('Отговорът не е в очаквания формат. Опитайте отново.'); }
     const checked = z.object({ anamneza: z.string(), status: z.string(), izsledvania: z.string(), terapia: z.string() }).safeParse(parsed);
     if (!checked.success) throw new Error('Получен е непълен отчет. Опитайте отново.');
-    return { report: checked.data, remaining: left };
+    return { report: checked.data, remaining: left, preset: { template: data.template, style: data.style } };
   });
 
 export const demoAssistant = createServerFn({ method: 'POST' })
@@ -105,4 +106,28 @@ export const demoSonioxKey = createServerFn({ method: 'POST' })
     const payload = await response.json() as { api_key?: string };
     if (!payload.api_key) throw new Error('Липсва временен ключ за транскрипция.');
     return { api_key: payload.api_key, remaining: left, maxSeconds: 300 };
+  });
+
+// Derived demo documents: only from reviewed report sections; shares the EXISTING assistant quota buckets.
+const docSection = z.string().max(DOC_SECTION_MAX);
+export const demoDocument = createServerFn({ method: 'POST' })
+  .inputValidator((input: unknown) => {
+    const d = z.object({ token: tokenSchema, kind: z.enum(DOC_KINDS), language: z.enum(DOC_LANGS), sections: z.object({ anamneza: docSection, status: docSection, izsledvania: docSection, terapia: docSection }).strict() }).strict().parse(input);
+    const c = checkDocumentInput(d.sections); // whole input, before quota/provider
+    if (!c.ok) throw new Error(c.problem === 'empty' ? 'Няма прегледани раздели за документ.' : 'Отчетът е твърде дълъг за документ. Нищо не е изпратено.');
+    return d;
+  })
+  .handler(async ({ data }) => {
+    const { claims, ipHash } = await guard(data.token);
+    const left = await quota('assistant', claims!.sid, ipHash);
+    const s = data.sections;
+    const source = `Анамнеза:\n${s.anamneza || '(празно)'}\n\nСтатус:\n${s.status || '(празно)'}\n\nИзследвания:\n${s.izsledvania || '(празно)'}\n\nТерапия:\n${s.terapia || '(празно)'}`;
+    const { streamClinicalText } = await import('@/lib/ai/clinical.server');
+    const result = streamClinicalText(secret(), [
+      { role: 'system', content: documentPrompt(data.kind, data.language) },
+      { role: 'user', content: `Прегледан отчет (единствен източник):\n${source}` },
+    ], { maxOutputTokens: DOC_OUTPUT_CAP });
+    const text = (await result.text).trim();
+    if (!text || (await result.finishReason) === 'length') throw new Error('Документът не беше създаден. Опитайте отново.');
+    return { text, remaining: left };
   });

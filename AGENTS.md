@@ -23,3 +23,4 @@
 - AI input is validated whole by src/lib/ai-input.ts and rejected before quota/provider; never slice transcripts silently.
 - Report section state transitions (revisions, tracked insertions, Undo, guarded merge) live in src/lib/report-state.ts as pure functions so they stay testable.
 - Recorder/timer lifetime is owned by RecordingLifecycle; every async step checks its generation.
+- Demo scribe rules (presets, document eligibility/staleness, late-result discard) live in src/lib/demo-scribe.ts as pure functions; documents reuse the assistant quota so no new spend path exists.

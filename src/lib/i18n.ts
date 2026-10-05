@@ -141,6 +141,9 @@ const serverErrorsEn: [string, string][] = [
   ['Отговорът не е в очаквания формат', 'The response was not in the expected format. Try again.'],
   ['Получен е непълен отчет', 'An incomplete report was received. Try again.'],
   ['Асистентът не върна', 'The assistant returned no suggestion.'],
+  ['Документът не беше създаден', 'The document was not created. Your work is kept.'],
+  ['Отчетът е твърде дълъг за документ', 'The report is too long for a document. Nothing was sent.'],
+  ['Няма прегледани раздели', 'There are no reviewed report sections.'],
   ['Транскрипцията не е настроена', 'Transcription is not configured. Enter the conversation manually.'],
   ['Не може да се стартира транскрипция', 'Transcription could not start. Try again.'],
   ['Липсва временен ключ', 'Missing temporary transcription key.'],
@@ -173,3 +176,45 @@ export function demoSessionsFor(lang: Language): Session[] {
 }
 
 export const dateFor = (lang: Language, date: string) => new Intl.DateTimeFormat(lang === 'bg' ? 'bg-BG' : 'en-GB', { timeZone: 'Europe/Sofia', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(date));
+
+/** Demo scribe extensions (guided cases, presets, derived documents). */
+const scribeBg = {
+  tryTitle: 'Пробвайте примерна консултация', trySub: 'Три изцяло измислени случая. Зареждат се в нова демо сесия — текущата работа остава.', tryLoad: 'Зареди', tryLoaded: 'Примерният случай е зареден в нова демо сесия.', tryOpen: 'Примерни случаи',
+  priorTitle: 'Измислен предходен контекст',
+  steps: ['Разговор', 'Отчет', 'Проверка', 'Документи'] as string[], progress: 'Напредък',
+  presetLabel: 'Профил на отчета (специалност/работен процес)', templateLabel: 'Шаблон', styleLabel: 'Стил',
+  templates: { general: 'Обща консултация', followup: 'Контролен преглед', msk: 'Опорно-двигателен' } as Record<string, string>,
+  styles: { concise: 'Кратък', detailed: 'Подробен', bullets: 'Точки' } as Record<string, string>,
+  presetUsed: (t: string, s: string) => `Генериран с: ${t} · ${s}`,
+  docsTitle: 'Документи (демо)', docsSub: 'Създават се само от прегледаните раздели на отчета — не от суровия разговор или чата.',
+  docKinds: { patient_summary: 'Резюме за пациента', referral: 'Чернова на направление', soap: 'SOAP бележка' } as Record<string, string>,
+  docLang: 'Език на документа', docGenerate: 'Създай', docGenerating: 'Създава се…', docRegenerate: 'Създай отново',
+  docWatermark: 'ДЕМО — измислени данни — чернова за преглед', docSource: 'Източник: прегледан отчет',
+  docNeedReport: 'Първо генерирайте или попълнете отчета.', docNeedReview: (s: string) => `Прегледайте всички попълнени раздели преди създаване на документ. Непрегледани: ${s}.`,
+  docStale: 'Отчетът е променен след създаването. Създайте документа отново — копиране и печат са спрени.',
+  docReady: 'Документът е създаден. Прегледайте го.', docDiscarded: 'Документът беше редактиран междувременно — новият резултат не е приложен.',
+  docFail: 'Документът не беше създаден. Работата Ви е запазена.', docTooLong: 'Отчетът е твърде дълъг за документ. Нищо не е изпратено.',
+  docVerify: 'Прегледано', docVerified: 'Прегледано ✓', docCopy: 'Копирай', docPrint: 'Печат', docUnreviewed: 'Документът не е прегледан.',
+  docQuota: (n: number) => `Оставащи заявки (асистент и документи): ${n}`,
+};
+type ScribeDict = typeof scribeBg;
+const scribeEn: ScribeDict = {
+  tryTitle: 'Try a sample consultation', trySub: 'Three entirely fictional cases. They load into a new demo session — your current work stays.', tryLoad: 'Load', tryLoaded: 'Sample case loaded into a new demo session.', tryOpen: 'Sample cases',
+  priorTitle: 'Fictional prior context',
+  steps: ['Conversation', 'Report', 'Review', 'Documents'], progress: 'Progress',
+  presetLabel: 'Report preset (specialty/workflow)', templateLabel: 'Template', styleLabel: 'Style',
+  templates: { general: 'General consultation', followup: 'Follow-up', msk: 'Musculoskeletal' },
+  styles: { concise: 'Concise', detailed: 'Detailed', bullets: 'Bullets' },
+  presetUsed: (t, s) => `Generated with: ${t} · ${s}`,
+  docsTitle: 'Documents (demo)', docsSub: 'Created only from the reviewed report sections — not from the raw conversation or chat.',
+  docKinds: { patient_summary: 'Patient-friendly summary', referral: 'Referral draft', soap: 'SOAP note' },
+  docLang: 'Document language', docGenerate: 'Create', docGenerating: 'Creating…', docRegenerate: 'Create again',
+  docWatermark: 'DEMO — fictional data — draft for review', docSource: 'Source: reviewed report',
+  docNeedReport: 'Generate or fill in the report first.', docNeedReview: (s) => `Review all filled report sections before creating a document. Not reviewed: ${s}.`,
+  docStale: 'The report changed after this was created. Create the document again — copy and print are blocked.',
+  docReady: 'Document created. Please review it.', docDiscarded: 'The document was edited meanwhile — the new result was not applied.',
+  docFail: 'The document was not created. Your work is kept.', docTooLong: 'The report is too long for a document. Nothing was sent.',
+  docVerify: 'Reviewed', docVerified: 'Reviewed ✓', docCopy: 'Copy', docPrint: 'Print', docUnreviewed: 'The document is not reviewed.',
+  docQuota: (n) => `Remaining requests (assistant and documents): ${n}`,
+};
+export const scribeUi: Record<Language, ScribeDict> = { bg: scribeBg, en: scribeEn };

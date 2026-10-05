@@ -7,5 +7,4 @@
 }
 :root { --background:oklch(0.975 0.004 220);--foreground:oklch(0.23 0.02 230);--card:oklch(1 0 0);--primary:oklch(0.46 0.09 205);--primary-foreground:oklch(1 0 0);--secondary:oklch(0.95 0.025 205);--muted:oklch(0.955 0.006 220);--muted-foreground:oklch(0.5 0.02 230);--accent:oklch(0.95 0.025 205);--destructive:oklch(0.55 0.2 27);--border:oklch(0.91 0.01 220);--warning:oklch(0.82 0.15 80);--warning-foreground:oklch(0.42 0.08 70); }
 @layer base { * {border-color:var(--border)} body {background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:14px} button,input,textarea {font:inherit} }
-@media print { .no-print {display:none!important} body {background:var(--card)} body * {visibility:hidden} .print-only, .print-only * {visibility:visible} .print-only {display:block!important;position:absolute;left:0;top:0;width:100%;padding:16px} .print-area {overflow:visible!important} }
-
+@media print { .no-print {display:none!important} body {background:var(--card)} body * {visibility:hidden} .print-only, .print-only * {visibility:visible} .print-only {display:block!important;position:absolute;left:0;top:0;width:100%;padding:16px} .print-area {overflow:visible!important} body[data-print-doc] .print-report {display:none!important} body:not([data-print-doc]) .print-doc {display:none!important} }

@@ -13,4 +13,4 @@
 - [x] Public functional demo: landing, ephemeral browser-memory workspace, demo server functions with token/origin/quotas, Soniox US 300 s keys, Luna report/assistant, tests and DEMO-QA.md.
 - [ ] Publish public demo — waiting on user review.
 - [x] Bulgarian/English language choice for the public demo (LANG-QA.md).
-
+- [x] Scribe demo package: guided cases, presets, derived documents (SCRIBE-DEMO-QA.md).
