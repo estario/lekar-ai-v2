@@ -2,7 +2,8 @@
 // Token = base64url(payload).base64url(HMAC-SHA256(payload)). Contains no user data.
 export type DemoClaims = { sid: string; iat: number; exp: number; v: 1 };
 export const DEMO_TTL_SECONDS = 2 * 60 * 60;
-export const DEMO_QUOTAS = { recordings: 3, reports: 5, assistant: 10 } as const;
+// TEMPORARY: demo limits lifted on user request (2026-10-06); restore tight quotas before real public launch.
+export const DEMO_QUOTAS = { recordings: 100000, reports: 100000, assistant: 100000 } as const;
 export type DemoQuotaKind = keyof typeof DEMO_QUOTAS;
 
 const enc = new TextEncoder();
@@ -64,9 +65,9 @@ export type ReserveItem = { bucket: string; limit: number; window: number };
 /** All-or-nothing reservation across buckets (service-only demo_reserve RPC). */
 export type Reserve = (items: ReserveItem[]) => Promise<{ ok: true; remaining: number[] } | { ok: false; failed: number }>;
 /** Conservative global demo provider ceilings per day (all visitors together). */
-export const DEMO_GLOBAL_DAILY = { recordings: 100, reports: 200, assistant: 400 } as const;
-export const DEMO_IP_DAILY_FACTOR = 6;
-export const DEMO_IP_PER_MINUTE = 20;
+export const DEMO_GLOBAL_DAILY = { recordings: 1000000, reports: 1000000, assistant: 1000000 } as const;
+export const DEMO_IP_DAILY_FACTOR = 1000;
+export const DEMO_IP_PER_MINUTE = 100000;
 
 /**
  * Reserves one billable demo action. The per-minute IP throttle is independent abuse throttling.
