@@ -179,7 +179,7 @@ export const dateFor = (lang: Language, date: string) => new Intl.DateTimeFormat
 
 /** Demo scribe extensions (guided cases, presets, derived documents). */
 const scribeBg = {
-  tryTitle: 'Пробвайте примерна консултация', trySub: 'Три изцяло измислени случая. Зареждат се в нова демо сесия — текущата работа остава.', tryLoad: 'Зареди', tryLoaded: 'Примерният случай е зареден в нова демо сесия.', tryOpen: 'Примерни случаи',
+  tryTitle: 'Пробвайте примерна консултация', trySub: 'Три изцяло измислени случая. Зареждат се в нова демо сесия — текущата работа остава.', tryLoad: 'Зареди', tryLoaded: 'Примерният случай е зареден в нова демо сесия.', tryOpen: 'Примерни случаи', tryClose: 'Затвори',
   priorTitle: 'Измислен предходен контекст',
   steps: ['Разговор', 'Отчет', 'Проверка', 'Документи'] as string[], progress: 'Напредък',
   presetLabel: 'Профил на отчета (специалност/работен процес)', templateLabel: 'Шаблон', styleLabel: 'Стил',
@@ -199,7 +199,7 @@ const scribeBg = {
 };
 type ScribeDict = typeof scribeBg;
 const scribeEn: ScribeDict = {
-  tryTitle: 'Try a sample consultation', trySub: 'Three entirely fictional cases. They load into a new demo session — your current work stays.', tryLoad: 'Load', tryLoaded: 'Sample case loaded into a new demo session.', tryOpen: 'Sample cases',
+  tryTitle: 'Try a sample consultation', trySub: 'Three entirely fictional cases. They load into a new demo session — your current work stays.', tryLoad: 'Load', tryLoaded: 'Sample case loaded into a new demo session.', tryOpen: 'Sample cases', tryClose: 'Close',
   priorTitle: 'Fictional prior context',
   steps: ['Conversation', 'Report', 'Review', 'Documents'], progress: 'Progress',
   presetLabel: 'Report preset (specialty/workflow)', templateLabel: 'Template', styleLabel: 'Style',

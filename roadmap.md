@@ -14,3 +14,5 @@
 - [ ] Publish public demo — waiting on user review.
 - [x] Bulgarian/English language choice for the public demo (LANG-QA.md).
 - [x] Scribe demo package: guided cases, presets, derived documents (SCRIBE-DEMO-QA.md).
+- [x] Fix workspace height/scrolling and move demo sample cases into an accessible dialog.
+- [x] Verify the updated workspace at 390px, 1024px and 1366px and record UI-LAYOUT-QA.md.
