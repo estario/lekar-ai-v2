@@ -7,6 +7,8 @@ Editor: https://lovable.dev/projects/8edcb921-cddd-47da-b742-f78009807ab8
 
 This is a versioned source snapshot, not an automatic two-way GitHub connection. App source, migrations, tests, and lockfile are copied from the pinned Lovable revision. The environment file is excluded; `.env.example` lists names without values. The exported `.gitignore` additionally excludes environment files. No original lekar-ai repository history or patient data is included.
 
+On 2026-10-06 this GitHub snapshot was prepared for public release under the MIT License. The root LICENSE, THIRD_PARTY_NOTICES.md, preserved shadcn/ui license, package license metadata and public-repository README wording are export-specific additions. They do not change the pinned application's behavior or provision Lovable Cloud credentials.
+
 Export-specific exception: Lovable pinned `@lovable.dev/vite-tanstack-config` to 2.25.2 without updating its committed lockfile. `bun.lock` was reconciled locally with Bun 1.4.2 (`bun install --lockfile-only --ignore-scripts`), then a frozen install and all checks succeeded. The exported README and review notes document the actual published snapshot and verification separately from Lovable's historical QA claims.
 
 The app uses Soniox US and `openai/gpt-6-luna` through Lovable AI. Use only fictional data in the public demo. Credentials and Cloud provisioning must be configured separately; this source export does not transfer them.
