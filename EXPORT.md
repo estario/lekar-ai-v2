@@ -1,6 +1,6 @@
 # Lekar AI v2 — source export
 
-Exported on 2026-10-05 from Lovable project `8edcb921-cddd-47da-b742-f78009807ab8` at revision `ca270d421427b423447d444ed760be449ffab769`, after the branding update. The scribe demo extension and follow-up fixes were at `d05e07bd1c03054022ef4dd2739c1aa61ee0c95c`. The source-review fixes were at `90600e7e83d0e9b4d7ec6ce4ab30a7d8287cdd3f`; the original review refers to baseline `afa0d07b4cf87448283ace53a2886d26f9458cff`.
+Exported on 2026-10-06 from Lovable project `8edcb921-cddd-47da-b742-f78009807ab8` at revision `07469bbe3bc4452dc1f7388ef1119cd7f53b2fba`, after a copy-only update removing the USA/САЩ qualifier from ten visible Soniox mentions in BG/EN. Type checking and the Lovable production build passed. The branding update was at `ca270d421427b423447d444ed760be449ffab769`. The scribe demo extension and follow-up fixes were at `d05e07bd1c03054022ef4dd2739c1aa61ee0c95c`. The source-review fixes were at `90600e7e83d0e9b4d7ec6ce4ab30a7d8287cdd3f`; the original review refers to baseline `afa0d07b4cf87448283ace53a2886d26f9458cff`.
 
 Live synthetic demo: https://lekari-ai-bulgaria.lovable.app/
 Editor: https://lovable.dev/projects/8edcb921-cddd-47da-b742-f78009807ab8
